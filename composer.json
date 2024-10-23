@@ -1,0 +1,35 @@
+{
+    "name": "otlib/rest-api",
+    "description": "This extension allows you to create and configure RESTful API endpoints in TYPO3 using the `Otlib\\RestApi\\Api`",
+    "type": "typo3-cms-extension",
+    "license": "GPL-2.0-or-later",
+    "version": "1.0.0",
+    "keywords": [
+        "TYPO3",
+        "extension",
+        "api",
+        "rest-api",
+        "typo3-rest-api",
+        "backend"
+    ],
+    "authors": [
+        {
+            "name": "Majd Othman",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.0",
+        "typo3/cms-core": "^11.5 || ^12.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Otlib\\RestApi\\": "Classes"
+        }
+    },
+    "extra": {
+        "typo3/cms": {
+            "extension-key": "otlib_rest_api"
+        }
+    }
+}
