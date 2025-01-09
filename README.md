@@ -18,20 +18,20 @@ authentication type.
 
 ### Basic Usage
 The following example demonstrates creating a basic API endpoint that responds to GET requests.
-This example creates a GET endpoint at  ```/api/products ``` that calls the list *method* of *ProductController*.
+This example creates a GET endpoint at  ```www.[Domain].com/api/check-product-status ``` that calls the 'getAll(ServerRequestInterface $request)' *method* of *ProductController*.
 
    ```php
     ext_localconf.php
     __________________
 
-    \Otlib\RestApi\Api::newApi('check')
+    \Otlib\RestApi\Api::newApi('check-product-status')
     ->setController(ProductController::class)
     ->setMethod('getAll');
    ```
 
 ### Advanced Usage
 The following example demonstrates creating a more advanced API endpoint with custom settings:.
-This example creates a POST endpoint at ```/_api/v2/``` check that requires Bearer token authentication and calls the check method
+This example creates a POST endpoint at ```/_api/v2/check-product-status``` check that requires Bearer token authentication and calls the 'checkProductStatus(ServerRequestInterface $request)' method
 of the ProductController.
 
    ```php
@@ -42,10 +42,10 @@ of the ProductController.
     use Otlib\RestApi\Enumeration\AuthType;
     use YourExtension\Controller\ProductController;
 
-    Api::newApi('check')
+    Api::newApi('check-product-status')
     ->setPathPrefix('_api/v2')
     ->setController(ProductController::class)
-    ->setMethod('check')
+    ->setMethod('checkProductStatus')
     ->setAuthType(AuthType::BEARER)
     ->setRequestMethod('POST')
     ->setHeaderWithNoCache(true);
@@ -66,7 +66,7 @@ The extension supports the following authentication types:
 use Otlib\RestApi\Api;
 use Otlib\RestApi\Enumeration\AuthType;
 
-Api::newApi('secure-endpoint')->setAuthType(AuthType::BEARER);
+Api::newApi('secure-endpoint')->setAuthType(AuthType::BEARER) ...;
 ```
 
 ### Error Handling
@@ -94,17 +94,17 @@ use Otlib\RestApi\Api;
 use Otlib\RestApi\Enumeration\AuthType;
 use YourExtension\Controller\ProductController;
 
-// Create a public API endpoint
-Api::newApi('public')
+// Create a public API endpoint (/api/product-info) -> (ProductController::class)->getProductInfo(ServerRequestInterface $request)
+Api::newApi('product-info')
 ->setController(ProductController::class)
-->setMethod('publicInfo')
+->setMethod('getProductInfo')
 ->setRequestMethod('GET')
 ->setAuthType(AuthType::NONE);
 
-// Create a protected API endpoint with Bearer token authentication
-Api::newApi('protected')
+// Create a protected API endpoint with Bearer token authentication (/api/product-info) -> (ProductController::class)->getProductInfo(ServerRequestInterface $request)
+Api::newApi('product-info')
 ->setController(ProductController::class)
-->setMethod('secureData')
+->setMethod('getProductInfo')
 ->setRequestMethod('POST')
 ->setAuthType(AuthType::BEARER)
 ->setHeaderWithNoCache(true);

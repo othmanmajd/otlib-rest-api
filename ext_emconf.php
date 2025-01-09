@@ -6,10 +6,10 @@ $EM_CONF['otlib_rest_api'] = [
     'author' => 'Majd Othman',
     'email' => 'dev.majdothman@gmail.com',
     'state' => 'stable',
-    'version' => '1.0.0',
+    'version' => '1.0.1',
     'constraints' => [
         'depends' => [
-            'typo3' => '11.0.0-12.9.99'
+            'typo3' => '11.0.0-13.9.99'
         ],
     ],
 ];
