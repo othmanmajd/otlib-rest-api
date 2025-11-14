@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Otlib\RestApi\Repository;
 
 use TYPO3\CMS\Core\Crypto\PasswordHashing\PasswordHashFactory;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class FeUserRepository extends AbstractRepository
@@ -23,5 +24,19 @@ class FeUserRepository extends AbstractRepository
             )->executeQuery()
             ->fetchOne();
         return $hashInstance->checkPassword($passwordToCheck, (string)$passwordInDb);
+    }
+
+    public function getUserByUid(int $userId): array
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('fe_users');
+        $user = $queryBuilder->select('*')
+            ->from('fe_users')
+            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($userId, Connection::PARAM_INT)))
+            ->executeQuery()
+            ->fetchAssociative();
+        if (!$user) {
+            return [];
+        }
+        return $user;
     }
 }

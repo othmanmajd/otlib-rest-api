@@ -5,23 +5,23 @@ declare(strict_types=1);
 namespace Otlib\RestApi;
 
 use Otlib\RestApi\Enumeration\AuthType;
+use Otlib\RestApi\Repository\ApiTokenRepository;
 use Otlib\RestApi\Repository\FeUserRepository;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
 
 class Auth
 {
-    public function __construct(private readonly FeUserRepository $feUserRepository)
-    {
+    public function __construct(
+        private readonly FeUserRepository $feUserRepository,
+        private readonly ApiTokenRepository $apiTokenRepository
+    ) {
     }
 
-    public function isUserAuthenticated(ServerRequestInterface $request, AuthType $authType): bool
+    public function isUserAuthenticated(ServerRequestInterface $request, AuthType $authType): bool|ServerRequestInterface
     {
         $authHeader = $request->getHeaderLine('Authorization');
         switch ($authType) {
-            case AuthType::BEARER:
-                $token = substr($authHeader, 7);
-                return $this->validateToken($token);
             case AuthType::BASIC:
                 $base64Credentials = substr($authHeader, 6);
                 $credentials = base64_decode($base64Credentials);
@@ -40,9 +40,7 @@ class Auth
                     return true;
                 }
 
-                $loginStatus = $this->feUserRepository->checkUserPassword($username, $password);
-
-                return $loginStatus;
+                return $this->feUserRepository->checkUserPassword($username, $password);
 
             default:
                 return false;
@@ -57,8 +55,41 @@ class Auth
         return $username === $validUsername && $password === $validPassword;
     }
 
-    protected function validateToken(string $token): bool
+    public function validateBearerToken(ServerRequestInterface $request): ServerRequestInterface
     {
-        return $token === ($_SERVER['OTLIB_AUTH_API_TOKEN'] ?? 'THERE IS NO TOKEN' . md5((string)time()));
+        $auth = $request->getHeaderLine('Authorization');
+        if (empty($auth) || stripos($auth, 'Bearer ') !== 0) {
+            return $request;
+        }
+
+        $bearer = substr($auth, 7);
+        [$selector, $validator] = explode('.', $bearer . '.');
+
+        if (empty($selector) || empty($validator)) {
+            return $request;
+        }
+
+        $row = $this->apiTokenRepository->getTokenData($selector);
+
+        if (!$row) {
+            return $request;
+        }
+
+        // check revoked / expiry
+        if ((int)$row['revoked'] === 1 || (int)$row['expires'] < time()) {
+            return $request;
+        }
+
+        // verify validator via password_verify to compare with saved hash
+        if (!password_verify($validator, $row['validator_hash'])) {
+            return $request;
+        }
+
+        // token ok -> attach user info to request for downstream controllers
+        return $request->withAttribute('otlibApiUser', [
+            'user_uid' => (int)$row['user_uid'],
+            'user' => $this->feUserRepository->getUserByUid(((int)$row['user_uid'])),
+            'scopes' => array_filter(array_map('trim', explode(',', $row['scopes'] ?? ''))),
+        ]);
     }
 }

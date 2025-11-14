@@ -7,8 +7,10 @@ namespace Otlib\RestApi\Middleware;
 use Otlib\RestApi\Api;
 use Otlib\RestApi\Auth;
 use Otlib\RestApi\Enumeration\AuthType;
+use Otlib\RestApi\Event\BeforeResponseEvent;
 use Otlib\RestApi\Exception\InvalidRequestMethodException;
 use Otlib\RestApi\Exception\MethodNotFoundException;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -23,7 +25,7 @@ class OtlibApiMiddleware implements MiddlewareInterface
      */
     private static array $apis = [];
 
-    public function __construct(Api $api, protected Auth $auth)
+    public function __construct(Api $api, protected Auth $auth, private readonly EventDispatcherInterface $eventDispatcher)
     {
         self::$apis = $api::getApis();
     }
@@ -34,19 +36,35 @@ class OtlibApiMiddleware implements MiddlewareInterface
         if (!$this->isApiRequest($uri)) {
             return $handler->handle($request);
         }
-
-        /** @var Api $api */
         foreach (self::$apis as $api) {
             if ($uri === '/' . $api->getPath()) {
-                if ($api->getAuthType()->name !== AuthType::NONE->name &&
-                    !$this->auth->isUserAuthenticated($request, $api->getAuthType())) {
+                $authorized = true;
+                switch ($api->getAuthType()->value) {
+                    case AuthType::BEARER->value:
+                        if ($api->getAuthType()->name !== AuthType::NONE->name) {
+                            $request = $this->auth->validateBearerToken($request);
+                            if (!$request->getAttribute('otlibApiUser', null)) {
+                                $authorized = false;
+                            }
+                        }
+                        break;
+                    default:
+                        if ($api->getAuthType()->name !== AuthType::NONE->name &&
+                            !$this->auth->isUserAuthenticated($request, $api->getAuthType())) {
+                            $authorized = false;
+                        }
+                        break;
+                }
+                // Adjust the current request using the BeforeResponseEvent
+                $request = $this->initBeforeResponseEvent($request);
+
+                if (!$authorized) {
                     return $this->createJsonResponseWithNoCache(
                         ['message' => '401 Unauthorized'],
                         401,
                         ['WWW-Authenticate' => ucfirst($api->getAuthType()->value) . ' realm="Access denied"']
                     );
                 }
-
                 if (strtolower($api->getRequestMethod()) !== strtolower($request->getMethod())) {
                     throw new InvalidRequestMethodException('Error: Invalid order method');
                 }
@@ -69,7 +87,7 @@ class OtlibApiMiddleware implements MiddlewareInterface
             }
         }
 
-        return  $this->addNoCacheHeaders(new JsonResponse(['message' => 'Access denied!'], 403));
+        return $this->addNoCacheHeaders(new JsonResponse(['message' => 'Access denied!'], 403));
     }
 
     protected function isApiRequest(string $uri): bool
@@ -97,6 +115,7 @@ class OtlibApiMiddleware implements MiddlewareInterface
 
     /**
      * Creates a JsonResponse with the specified data and status code, and applies no-cache headers.
+     *
      * @param array<string,mixed> $data
      * @param array<string,string> $headers
      */
@@ -104,5 +123,18 @@ class OtlibApiMiddleware implements MiddlewareInterface
     {
         $response = new JsonResponse($data, $status, $headers);
         return $this->addNoCacheHeaders($response);
+    }
+
+    private function initBeforeResponseEvent(ServerRequestInterface $request): ServerRequestInterface
+    {
+        $event = new BeforeResponseEvent($request);
+        $event = $this->eventDispatcher->dispatch($event);
+
+        $modifiedRequest = $event->getRequest();
+        foreach ($event->getAttributes() as $key => $value) {
+            $modifiedRequest = $modifiedRequest->withAttribute($key, $value);
+        }
+
+        return $modifiedRequest;
     }
 }

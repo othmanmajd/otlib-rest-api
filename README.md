@@ -69,6 +69,9 @@ use Otlib\RestApi\Enumeration\AuthType;
 Api::newApi('secure-endpoint')->setAuthType(AuthType::BEARER) ...;
 ```
 
+### EventListener
+- BeforeResponseEvent (Adjust the current request using the BeforeResponseEvent)
+
 ### Error Handling
 The extension uses custom exceptions to handle errors:
 
